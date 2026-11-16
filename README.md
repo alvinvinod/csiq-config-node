@@ -2,9 +2,9 @@
 
 Node gRPC client for CareStack Configuration. Depend on `IConfigurationClient`. Create **one client per process** and reuse it.
 
-The service resolves override layers. This client does not. Each public method is one unary RPC. Prefer `getAll(practiceId, names)` over looping `isFeatureEnabled()`.
+The service resolves override layers. This client does not. Each public method is one unary RPC. Prefer `getAll(casTenantId, names)` over looping `isFeatureEnabled()`.
 
-A down service throws `ConfigurationException`. It does not return `false` or a cached flag. There is no client-side cache. `accountId` is CSIQ `practice_id`.
+A down service throws `ConfigurationException`. It does not return `false` or a cached flag. There is no client-side cache. `casTenantId` is the CAS tenant id.
 
 ## Install
 
@@ -20,8 +20,8 @@ npm install csiq-config-node
 const { getSharedClient } = require('csiq-config-node');
 
 const client = getSharedClient();
-const memoOn = await client.isFeatureEnabled('is_memo_enabled', practiceId);
-const set = await client.getAll(practiceId, ['is_memo_enabled', 'dni_regex'], { userId });
+const memoOn = await client.isFeatureEnabled('is_memo_enabled', casTenantId);
+const set = await client.getAll(casTenantId, ['is_memo_enabled', 'dni_regex'], { userId });
 ```
 
 Call `client.close()` once on process shutdown.
@@ -40,15 +40,15 @@ Optional `options`: `{ userId, locationId, locationGroupId, attributeArea, confi
 
 | Method | Use when | Missing name / no stored row |
 | --- | --- | --- |
-| `isFeatureEnabled(name, accountId, options?)` | One **feature** toggle | `false`. Off, defined-but-empty, and unknown name are not distinguishable. A config or dev toggle name fails the call. |
-| `isDevToggleEnabled(name, accountId, options?)` | One **dev** toggle | Same as `isFeatureEnabled`: `false`. |
-| `tryGet(name, accountId, options?)` | One value, any type | `null` if the name is not a definition, or a non-toggle config has no value. A feature/dev toggle with no row is `false`, not `null`. |
-| `getConfigurationDetails(name, accountId, options?)` | Winner plus which layer it came from | Throws `ConfigurationException`. Prefer `tryGet` when missing is expected. |
-| `getAll(accountId, names?, options?)` | Several keys, **one RPC** | Named list → `GetAllTogglesAndConfigurationsByNames`. Empty `names` → every definition; use for dumps, not a request path. Toggles with no row are `false`. Configs and unknown names are **omitted**. |
-| `getAllAccountConfigurations(name, accountId, overrideLevels, options?)` | Stored rows at given `OverrideLevel`s, not the winner | A toggle with no stored value is absent here even though `isFeatureEnabled` would be `false`. |
+| `isFeatureEnabled(name, casTenantId, options?)` | One **feature** toggle | `false`. Off, defined-but-empty, and unknown name are not distinguishable. A config or dev toggle name fails the call. |
+| `isDevToggleEnabled(name, casTenantId, options?)` | One **dev** toggle | Same as `isFeatureEnabled`: `false`. |
+| `tryGet(name, casTenantId, options?)` | One value, any type | `null` if the name is not a definition, or a non-toggle config has no value. A feature/dev toggle with no row is `false`, not `null`. |
+| `getConfigurationDetails(name, casTenantId, options?)` | Winner plus which layer it came from | Throws `ConfigurationException`. Prefer `tryGet` when missing is expected. |
+| `getAll(casTenantId, names?, options?)` | Several keys, **one RPC** | Named list → `GetAllTogglesAndConfigurationsByNames`. Empty `names` → every definition; use for dumps, not a request path. Toggles with no row are `false`. Configs and unknown names are **omitted**. |
+| `getAllAccountConfigurations(name, casTenantId, overrideLevels, options?)` | Stored rows at given `OverrideLevel`s, not the winner | A toggle with no stored value is absent here even though `isFeatureEnabled` would be `false`. |
 
 ```js
-const set = await client.getAll(practiceId, ['is_memo_enabled', 'dni_regex'], { userId });
+const set = await client.getAll(casTenantId, ['is_memo_enabled', 'dni_regex'], { userId });
 const memoOn = set.toggles.is_memo_enabled ?? false;
 const regex = set.configurations.dni_regex ?? null;
 // missing vs off: 'dni_regex' in set.configurations
@@ -60,8 +60,8 @@ The definition must already exist. These calls do not create one.
 
 | Method | Effect |
 | --- | --- |
-| `upsert(name, accountId, value, editedByUserId, options?)` | Insert or replace at that layer. `bool` → boolean, `int` → number, `string` → string, anything else → JSON. A lost response can be retried, so a write may be sent more than once. |
-| `delete(name, accountId, deletedByUserId, options?)` | Remove the stored value. The definition stays. A later feature/dev toggle read is `false`. |
+| `upsert(name, casTenantId, value, editedByUserId, options?)` | Insert or replace at that layer. `bool` → boolean, `int` → number, `string` → string, anything else → JSON. A lost response can be retried, so a write may be sent more than once. |
+| `delete(name, casTenantId, deletedByUserId, options?)` | Remove the stored value. The definition stays. A later feature/dev toggle read is `false`. |
 
 ### Lifecycle
 
@@ -94,7 +94,7 @@ npm test          # unit; no live service
 npm run smoke     # live HTTPS localhost:7154; exports the ASP.NET cert unless CONFIG_SERVICE_ROOT_CERT_PATH is set
 ```
 
-`SMOKE_PRACTICE_ID` (default `10001`), `SMOKE_FLAG`, `SMOKE_WRITE=true`.
+`SMOKE_TENANT_ID` (default `10001`), `SMOKE_FLAG`, `SMOKE_WRITE=true`.
 
 Plaintext: `CONFIG_SERVICE_URI=127.0.0.1:8081 CONFIG_SERVICE_INSECURE=true npm run smoke`.
 

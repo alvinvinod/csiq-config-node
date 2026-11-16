@@ -10,7 +10,7 @@
  * Plaintext HTTP/2 (mapped 8081):
  *   CONFIG_SERVICE_URI=127.0.0.1:8081 CONFIG_SERVICE_INSECURE=true npm run smoke
  *
- * Optional: SMOKE_PRACTICE_ID (10001), SMOKE_FLAG (first toggle from getAll, else EnableFoo),
+ * Optional: SMOKE_TENANT_ID (10001), SMOKE_FLAG (first toggle from getAll, else EnableFoo),
  * SMOKE_WRITE=true to flip and restore a feature toggle.
  * CONFIG_SERVICE_ROOT_CERT_PATH overrides the exported ASP.NET HTTPS cert.
  *
@@ -22,7 +22,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const practiceId = intEnv('SMOKE_PRACTICE_ID', 10001);
+const casTenantId = intEnv('SMOKE_TENANT_ID', 10001);
 const write = truthy(process.env.SMOKE_WRITE);
 const host = process.env.CONFIG_SERVICE_URI || 'localhost:7154';
 const insecure = truthy(process.env.CONFIG_SERVICE_INSECURE);
@@ -84,7 +84,7 @@ function show(value) {
 
 async function main() {
   console.log(
-    `smoke: ${host} insecure=${insecure} practiceId=${practiceId}` +
+    `smoke: ${host} insecure=${insecure} casTenantId=${casTenantId}` +
       (rootCertPath ? ` rootCertPath=${rootCertPath}` : ''),
   );
 
@@ -95,7 +95,7 @@ async function main() {
   });
 
   try {
-    const dump = await client.getAll(practiceId);
+    const dump = await client.getAll(casTenantId);
     const toggleNames = Object.keys(dump.toggles);
     const configNames = Object.keys(dump.configurations);
     console.log(`getAll(): ${toggleNames.length} toggles, ${configNames.length} configurations`);
@@ -106,18 +106,18 @@ async function main() {
     const flag = process.env.SMOKE_FLAG || toggleNames[0] || 'EnableFoo';
     console.log(`flag: ${flag}`);
 
-    const named = await client.getAll(practiceId, [flag]);
+    const named = await client.getAll(casTenantId, [flag]);
     console.log(
       `getAll(names): toggle=${show(named.toggles[flag])} config=${
         flag in named.configurations ? show(named.configurations[flag]) : '(omitted)'
       }`,
     );
 
-    const enabled = await client.isFeatureEnabled(flag, practiceId);
+    const enabled = await client.isFeatureEnabled(flag, casTenantId);
     console.log(`isFeatureEnabled(): ${show(enabled)}`);
 
     try {
-      const dev = await client.isDevToggleEnabled(flag, practiceId);
+      const dev = await client.isDevToggleEnabled(flag, casTenantId);
       console.log(`isDevToggleEnabled(): ${show(dev)}`);
     } catch (err) {
       if (err instanceof ConfigurationException) {
@@ -127,11 +127,11 @@ async function main() {
       }
     }
 
-    const tried = await client.tryGet(flag, practiceId);
+    const tried = await client.tryGet(flag, casTenantId);
     console.log(`tryGet(): ${show(tried)}`);
 
     try {
-      const details = await client.getConfigurationDetails(flag, practiceId);
+      const details = await client.getConfigurationDetails(flag, casTenantId);
       console.log(
         `getConfigurationDetails(): name=${details.name} value=${show(details.value)} priority=${details.priority} type=${details.type} accountId=${details.accountId}`,
       );
@@ -143,7 +143,7 @@ async function main() {
       }
     }
 
-    const rows = await client.getAllAccountConfigurations(flag, practiceId, [
+    const rows = await client.getAllAccountConfigurations(flag, casTenantId, [
       OverrideLevel.Practice,
       OverrideLevel.VoiceStack,
     ]);
@@ -155,7 +155,7 @@ async function main() {
     }
 
     try {
-      await client.getConfigurationDetails('DoesNotExist_csiq_node_smoke', practiceId);
+      await client.getConfigurationDetails('DoesNotExist_csiq_node_smoke', casTenantId);
       console.error('missing name should have thrown');
       process.exitCode = 1;
       return;
@@ -168,11 +168,11 @@ async function main() {
     }
 
     if (write) {
-      await client.upsert(flag, practiceId, !enabled, 1);
-      const flipped = await client.isFeatureEnabled(flag, practiceId);
+      await client.upsert(flag, casTenantId, !enabled, 1);
+      const flipped = await client.isFeatureEnabled(flag, casTenantId);
       console.log(`after upsert: ${show(flipped)}`);
-      await client.upsert(flag, practiceId, enabled, 1);
-      console.log(`restored: ${show(await client.isFeatureEnabled(flag, practiceId))}`);
+      await client.upsert(flag, casTenantId, enabled, 1);
+      console.log(`restored: ${show(await client.isFeatureEnabled(flag, casTenantId))}`);
     }
   } finally {
     client.close();

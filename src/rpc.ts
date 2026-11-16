@@ -42,18 +42,18 @@ export function unwrapInt(wrapper: { value?: number } | number | null | undefine
 
 export function namedRequest(
   name: string,
-  accountId: number,
+  casTenantId: number,
   options: ConditionOptions = {},
 ): RpcMessage {
   return {
     name,
-    condition: conditionRequest(accountId, options),
+    condition: conditionRequest(casTenantId, options),
   };
 }
 
-export function conditionRequest(accountId: number, options: ConditionOptions = {}): RpcMessage {
+export function conditionRequest(casTenantId: number, options: ConditionOptions = {}): RpcMessage {
   const condition: RpcMessage = {
-    accountId: wrapInt(accountId),
+    accountId: wrapInt(casTenantId),
     configDefinitionScope: options.configDefinitionScope ?? ConfigDefinitionScope.Server,
   };
   const userId = wrapInt(options.userId);
