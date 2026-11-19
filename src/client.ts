@@ -26,21 +26,21 @@ export class ConfigurationClient implements IConfigurationClient {
     this.breaker = createCircuitBreaker(config.circuitBreaker);
   }
 
-  isFeatureEnabled(name: string, accountId: number, options?: ConditionOptions): Promise<boolean> {
+  isFeatureEnabled(name: string, casTenantId: number, options?: ConditionOptions): Promise<boolean> {
     return this.call((deadline) =>
-      this.rpc.getFeatureToggleValue(namedRequest(name, accountId, options), deadline),
+      this.rpc.getFeatureToggleValue(namedRequest(name, casTenantId, options), deadline),
     ).then((response) => Boolean(response.value));
   }
 
-  isDevToggleEnabled(name: string, accountId: number, options?: ConditionOptions): Promise<boolean> {
+  isDevToggleEnabled(name: string, casTenantId: number, options?: ConditionOptions): Promise<boolean> {
     return this.call((deadline) =>
-      this.rpc.getDevToggleValue(namedRequest(name, accountId, options), deadline),
+      this.rpc.getDevToggleValue(namedRequest(name, casTenantId, options), deadline),
     ).then((response) => Boolean(response.value));
   }
 
-  async tryGet(name: string, accountId: number, options?: ConditionOptions): Promise<unknown> {
+  async tryGet(name: string, casTenantId: number, options?: ConditionOptions): Promise<unknown> {
     const response = await this.call((deadline) =>
-      this.rpc.tryGetConfigurationDetails(namedRequest(name, accountId, options), deadline),
+      this.rpc.tryGetConfigurationDetails(namedRequest(name, casTenantId, options), deadline),
     );
     const details = response.configurationDetails as RpcMessage | undefined;
     if (!details) {
@@ -55,11 +55,11 @@ export class ConfigurationClient implements IConfigurationClient {
 
   async getConfigurationDetails(
     name: string,
-    accountId: number,
+    casTenantId: number,
     options?: ConditionOptions,
   ): Promise<ConfigurationDetails> {
     const response = await this.call((deadline) =>
-      this.rpc.getConfigurationDetails(namedRequest(name, accountId, options), deadline),
+      this.rpc.getConfigurationDetails(namedRequest(name, casTenantId, options), deadline),
     );
     if (!response || typeof response.name !== 'string') {
       throw new ConfigurationException(
@@ -71,7 +71,7 @@ export class ConfigurationClient implements IConfigurationClient {
 
   async getAllAccountConfigurations(
     name: string,
-    accountId: number,
+    casTenantId: number,
     overrideLevels: number[],
     options?: ConditionOptions,
   ): Promise<ConfigurationDetails[]> {
@@ -79,7 +79,7 @@ export class ConfigurationClient implements IConfigurationClient {
       this.rpc.getAllAccountConfigurationByNamesAndPriorities(
         {
           name,
-          condition: conditionRequest(accountId, options),
+          condition: conditionRequest(casTenantId, options),
           priorities: overrideLevels,
         },
         deadline,
@@ -89,8 +89,8 @@ export class ConfigurationClient implements IConfigurationClient {
     return items.map(toDetails);
   }
 
-  async getAll(accountId: number, names: string[] = [], options?: ConditionOptions): Promise<ToggleSet> {
-    const condition = conditionRequest(accountId, options);
+  async getAll(casTenantId: number, names: string[] = [], options?: ConditionOptions): Promise<ToggleSet> {
+    const condition = conditionRequest(casTenantId, options);
     const response =
       names.length === 0
         ? await this.call((deadline) => this.rpc.getAllTogglesAndConfigurations(condition, deadline))
@@ -113,7 +113,7 @@ export class ConfigurationClient implements IConfigurationClient {
 
   async upsert(
     name: string,
-    accountId: number,
+    casTenantId: number,
     value: unknown,
     editedByUserId: number,
     options?: ConditionOptions,
@@ -124,7 +124,7 @@ export class ConfigurationClient implements IConfigurationClient {
         {
           typeValuePair: { type: encoded.type, value: { value: encoded.json } },
           editedByUserId,
-          condition: namedRequest(name, accountId, options),
+          condition: namedRequest(name, casTenantId, options),
         },
         deadline,
       ),
@@ -133,7 +133,7 @@ export class ConfigurationClient implements IConfigurationClient {
 
   async delete(
     name: string,
-    accountId: number,
+    casTenantId: number,
     deletedByUserId: number,
     options?: ConditionOptions,
   ): Promise<void> {
@@ -141,7 +141,7 @@ export class ConfigurationClient implements IConfigurationClient {
       this.rpc.deleteConfiguration(
         {
           deletedByUserId,
-          condition: namedRequest(name, accountId, options),
+          condition: namedRequest(name, casTenantId, options),
         },
         deadline,
       ),

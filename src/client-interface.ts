@@ -3,7 +3,8 @@ import type { ConditionOptions, ConfigurationDetails, ToggleSet } from './types'
 /**
  * Read and write CareStack configuration over gRPC.
  *
- * Every method takes an account id (CSIQ practice_id). Optional ids in
+ * Every method takes a CAS tenant id.
+ * Callers pass casTenantId. Optional ids in
  * `options` narrow the override layer: user, location, location group,
  * attribute area. Omitted ids are not sent. Scope defaults to Server.
  *
@@ -21,14 +22,14 @@ export interface IConfigurationClient {
    *
    * A down service throws ConfigurationException; it does not return false.
    */
-  isFeatureEnabled(name: string, accountId: number, options?: ConditionOptions): Promise<boolean>;
+  isFeatureEnabled(name: string, casTenantId: number, options?: ConditionOptions): Promise<boolean>;
 
   /**
    * Resolved dev toggle. Same missing-name behavior as isFeatureEnabled(): false.
    *
    * The name must be a dev toggle.
    */
-  isDevToggleEnabled(name: string, accountId: number, options?: ConditionOptions): Promise<boolean>;
+  isDevToggleEnabled(name: string, casTenantId: number, options?: ConditionOptions): Promise<boolean>;
 
   /**
    * Resolved value for one name, or null when nothing matches.
@@ -39,7 +40,7 @@ export interface IConfigurationClient {
    *
    * Decoded by the definition type: bool, int, string, or object/array.
    */
-  tryGet(name: string, accountId: number, options?: ConditionOptions): Promise<unknown>;
+  tryGet(name: string, casTenantId: number, options?: ConditionOptions): Promise<unknown>;
 
   /**
    * Resolved winner for one name, including which override layer it came from.
@@ -49,7 +50,7 @@ export interface IConfigurationClient {
    */
   getConfigurationDetails(
     name: string,
-    accountId: number,
+    casTenantId: number,
     options?: ConditionOptions,
   ): Promise<ConfigurationDetails>;
 
@@ -63,7 +64,7 @@ export interface IConfigurationClient {
    */
   getAllAccountConfigurations(
     name: string,
-    accountId: number,
+    casTenantId: number,
     overrideLevels: number[],
     options?: ConditionOptions,
   ): Promise<ConfigurationDetails[]>;
@@ -77,7 +78,7 @@ export interface IConfigurationClient {
    * Defined toggles with no stored row come back as false. Config names with no value
    * and unknown names are omitted; use `'name' in set.configurations`, not a truthiness test.
    */
-  getAll(accountId: number, names?: string[], options?: ConditionOptions): Promise<ToggleSet>;
+  getAll(casTenantId: number, names?: string[], options?: ConditionOptions): Promise<ToggleSet>;
 
   /**
    * Insert or replace the value at the layer described by `options`.
@@ -88,7 +89,7 @@ export interface IConfigurationClient {
    */
   upsert(
     name: string,
-    accountId: number,
+    casTenantId: number,
     value: unknown,
     editedByUserId: number,
     options?: ConditionOptions,
@@ -102,7 +103,7 @@ export interface IConfigurationClient {
    */
   delete(
     name: string,
-    accountId: number,
+    casTenantId: number,
     deletedByUserId: number,
     options?: ConditionOptions,
   ): Promise<void>;
