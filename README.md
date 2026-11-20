@@ -26,7 +26,7 @@ const set = await client.getAll(casTenantId, ['is_memo_enabled', 'dni_regex'], {
 
 Call `client.close()` once on process shutdown.
 
-Outside `local` / `development` / `test` / `testing`, loopback hosts and `insecure: true` throw.
+Outside `local` / `development` / `test` / `testing`, loopback hosts (`127.0.0.0/8`, `localhost`, `::1`, `0.0.0.0`) and `insecure: true` throw. Scripts talking to a non-loopback host need `CONFIG_SERVICE_ALLOW_REMOTE=true`.
 
 **Explicit config** (tests, custom host): `createConfigurationClient({ host, insecure, rootCertPath, … }, logger)`. **Env object:** `configFromEnvironment()`. **Scripts:** `createConfigurationClient()` (no singleton, no prod guard). Apps should use `getSharedClient()`.
 

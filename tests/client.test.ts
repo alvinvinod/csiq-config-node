@@ -310,6 +310,27 @@ describe('ConfigurationClient retry', () => {
     assert.equal(attempt, 1);
   });
 
+  it('does not start an attempt after the deadline', async () => {
+    let attempt = 0;
+    const stub = fakeStub({
+      getFeatureToggleValue: async () => {
+        attempt += 1;
+        await sleep(30);
+        grpcError(status.UNAVAILABLE);
+      },
+    });
+    const c = makeClient(stub, {
+      timeoutMs: 20,
+      retryPolicy: { maxAttempts: 5, initialBackoffMs: 0, maxBackoffMs: 0 },
+    });
+    await assert.rejects(() => c.isFeatureEnabled('flag', 1), (err: unknown) => {
+      assert.ok(err instanceof ConfigurationException);
+      assert.ok(err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED);
+      return true;
+    });
+    assert.equal(attempt, 1);
+  });
+
   it('gives each retry only the time left on the call deadline', async () => {
     const remainingMs: number[] = [];
     const stub = fakeStub({
@@ -595,5 +616,21 @@ describe('getConfigurationDetails', () => {
       locationGroupId: 4,
       locationId: 3,
     });
+  });
+});
+
+describe('int32 ids', () => {
+  it('rejects casTenantId above int32', async () => {
+    await assert.rejects(
+      () => client(fakeStub()).isFeatureEnabled('flag', 3_000_000_000),
+      /casTenantId out of int32 range/,
+    );
+  });
+
+  it('rejects editedByUserId above int32', async () => {
+    await assert.rejects(
+      () => client(fakeStub()).upsert('flag', 1, true, 3_000_000_000),
+      /editedByUserId out of int32 range/,
+    );
   });
 });

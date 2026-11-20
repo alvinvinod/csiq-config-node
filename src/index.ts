@@ -5,6 +5,8 @@ export {
   getSharedClient,
   resetSharedClient,
   assertProductionSafe,
+  assertRemoteAllowed,
+  isLocalHost,
 } from './bootstrap';
 export {
   createConfig,

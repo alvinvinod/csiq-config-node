@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { decode, encode } from '../src/codec';
+import { ConfigurationException } from '../src/exception';
 import { AttributeType } from '../src/types';
 
 describe('encode', () => {
@@ -22,14 +23,24 @@ describe('encode', () => {
       assert.deepEqual(encode(value), { type, json });
     });
   }
+
+  it('wraps stringify failures as ConfigurationException', () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    assert.throws(() => encode(cyclic, 'flag'), (err: unknown) => {
+      assert.ok(err instanceof ConfigurationException);
+      assert.match(err.message, /cannot encode value for flag/);
+      return true;
+    });
+  });
 });
 
 describe('decode', () => {
   const cases: Array<[number, string | null, unknown]> = [
     [AttributeType.Boolean, 'true', true],
     [AttributeType.Boolean, 'false', false],
-    [AttributeType.Bit, '1', true],
-    [AttributeType.Bit, '0', false],
+    [AttributeType.Bit, 'true', true],
+    [AttributeType.Bit, 'false', false],
     [AttributeType.Number, '42', 42],
     [AttributeType.String, '"hello"', 'hello'],
     [AttributeType.Date, '"2026-10-30T00:00:00"', '2026-10-30T00:00:00'],
@@ -51,4 +62,22 @@ describe('decode', () => {
       assert.deepEqual(decode(encoded.type, encoded.json), value);
     }
   });
+
+  const corrupt: Array<[number, string]> = [
+    [AttributeType.Number, '1.5'],
+    [AttributeType.Number, '99999999999999999999'],
+    [AttributeType.Boolean, '"false"'],
+    [AttributeType.String, '{"a":1}'],
+    [AttributeType.String, 'not-json'],
+  ];
+
+  for (const [type, json] of corrupt) {
+    it(`throws ConfigurationException for ${json} as type ${type}`, () => {
+      assert.throws(() => decode(type, json, 'flag'), (err: unknown) => {
+        assert.ok(err instanceof ConfigurationException);
+        assert.match(err.message, /bad value for flag/);
+        return true;
+      });
+    });
+  }
 });

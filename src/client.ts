@@ -5,7 +5,7 @@ import { decode, encode } from './codec';
 import type { ConfigurationClientConfig } from './config';
 import { ConfigurationException } from './exception';
 import { createCircuitBreaker } from './circuit-breaker';
-import { conditionRequest, namedRequest, unwrapInt, type RpcMessage, type RpcStub } from './rpc';
+import { conditionRequest, int32, namedRequest, unwrapInt, type RpcMessage, type RpcStub } from './rpc';
 import { isRetryable, jitterMs, sleep } from './retry';
 import type { ConditionOptions, ConfigurationDetails, Logger, ToggleSet } from './types';
 
@@ -50,7 +50,7 @@ export class ConfigurationClient implements IConfigurationClient {
     if (!pair) {
       return null;
     }
-    return decodePair(pair);
+    return decodePair(pair, name);
   }
 
   async getConfigurationDetails(
@@ -61,11 +61,6 @@ export class ConfigurationClient implements IConfigurationClient {
     const response = await this.call((deadline) =>
       this.rpc.getConfigurationDetails(namedRequest(name, casTenantId, options), deadline),
     );
-    if (!response || typeof response.name !== 'string') {
-      throw new ConfigurationException(
-        `Entry not found for ${name} with provided condition (If this is expected - please use tryGet instead)`,
-      );
-    }
     return toDetails(response);
   }
 
@@ -105,7 +100,7 @@ export class ConfigurationClient implements IConfigurationClient {
 
     const configurations: Record<string, unknown> = {};
     for (const [key, pair] of Object.entries((response.configurations as Record<string, RpcMessage>) ?? {})) {
-      configurations[key] = decodePair(pair);
+      configurations[key] = decodePair(pair, key);
     }
 
     return { toggles, configurations };
@@ -118,12 +113,12 @@ export class ConfigurationClient implements IConfigurationClient {
     editedByUserId: number,
     options?: ConditionOptions,
   ): Promise<void> {
-    const encoded = encode(value);
+    const encoded = encode(value, name);
     await this.call((deadline) =>
       this.rpc.upsertConfiguration(
         {
           typeValuePair: { type: encoded.type, value: { value: encoded.json } },
-          editedByUserId,
+          editedByUserId: int32(editedByUserId, 'editedByUserId'),
           condition: namedRequest(name, casTenantId, options),
         },
         deadline,
@@ -140,7 +135,7 @@ export class ConfigurationClient implements IConfigurationClient {
     await this.call((deadline) =>
       this.rpc.deleteConfiguration(
         {
-          deletedByUserId,
+          deletedByUserId: int32(deletedByUserId, 'deletedByUserId'),
           condition: namedRequest(name, casTenantId, options),
         },
         deadline,
@@ -175,7 +170,13 @@ export class ConfigurationClient implements IConfigurationClient {
     let backoffMs = retry.initialBackoffMs;
 
     for (let attempt = 1; ; attempt++) {
-      const remainingMs = Math.max(deadlineAt - Date.now(), 1);
+      const remainingMs = deadlineAt - Date.now();
+      if (remainingMs <= 0) {
+        throw new ConfigurationException(
+          `gRPC ${status.DEADLINE_EXCEEDED}: deadline exceeded (attempt ${attempt} of ${retry.maxAttempts})`,
+          status.DEADLINE_EXCEEDED,
+        );
+      }
       try {
         const response = await start(new Date(Date.now() + remainingMs));
         if (attempt > 1) {
@@ -232,20 +233,21 @@ export class ConfigurationClient implements IConfigurationClient {
   }
 }
 
-function decodePair(pair: RpcMessage): unknown {
+function decodePair(pair: RpcMessage, name = ''): unknown {
   const type = Number(pair.type ?? 0);
   const wrapped = pair.value as { value?: string } | string | undefined;
   const json = typeof wrapped === 'string' ? wrapped : wrapped?.value;
-  return decode(type, json);
+  return decode(type, json, name);
 }
 
 function toDetails(rpc: RpcMessage): ConfigurationDetails {
   const pair = rpc.typeValuePair as RpcMessage | undefined;
+  const name = String(rpc.name ?? '');
   return {
-    name: String(rpc.name ?? ''),
+    name,
     priority: Number(rpc.priority ?? 0),
     type: Number(rpc.type ?? 0),
-    value: pair ? decodePair(pair) : null,
+    value: pair ? decodePair(pair, name) : null,
     accountId: unwrapInt(rpc.accountId as { value?: number } | number | null | undefined),
     userId: unwrapInt(rpc.userId as { value?: number } | number | null | undefined),
     locationGroupId: unwrapInt(rpc.locationGroupId as { value?: number } | number | null | undefined),

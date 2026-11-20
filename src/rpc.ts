@@ -26,8 +26,18 @@ type UnaryClient = grpc.Client & Record<string, Function>;
 
 const PROTO_PATH = path.join(__dirname, '..', 'proto', 'configuration.proto');
 
-export function wrapInt(value: number | undefined): { value: number } | undefined {
-  return value === undefined ? undefined : { value };
+const INT32_MIN = -2147483648;
+const INT32_MAX = 2147483647;
+
+export function int32(value: number, field: string): number {
+  if (!Number.isInteger(value) || value < INT32_MIN || value > INT32_MAX) {
+    throw new Error(`${field} out of int32 range: ${value}`);
+  }
+  return value;
+}
+
+export function wrapInt(value: number | undefined, field = 'id'): { value: number } | undefined {
+  return value === undefined ? undefined : { value: int32(value, field) };
 }
 
 export function unwrapInt(wrapper: { value?: number } | number | null | undefined): number | null {
@@ -53,22 +63,22 @@ export function namedRequest(
 
 export function conditionRequest(casTenantId: number, options: ConditionOptions = {}): RpcMessage {
   const condition: RpcMessage = {
-    accountId: wrapInt(casTenantId),
+    accountId: wrapInt(casTenantId, 'casTenantId'),
     configDefinitionScope: options.configDefinitionScope ?? ConfigDefinitionScope.Server,
   };
-  const userId = wrapInt(options.userId);
+  const userId = wrapInt(options.userId, 'userId');
   if (userId) {
     condition.userId = userId;
   }
-  const locationId = wrapInt(options.locationId);
+  const locationId = wrapInt(options.locationId, 'locationId');
   if (locationId) {
     condition.locationId = locationId;
   }
-  const locationGroupId = wrapInt(options.locationGroupId);
+  const locationGroupId = wrapInt(options.locationGroupId, 'locationGroupId');
   if (locationGroupId) {
     condition.locationGroupId = locationGroupId;
   }
-  const attributeArea = wrapInt(options.attributeArea);
+  const attributeArea = wrapInt(options.attributeArea, 'attributeArea');
   if (attributeArea) {
     condition.attributeArea = attributeArea;
   }
@@ -157,7 +167,11 @@ function unary(
           reject(new ConfigurationException(`gRPC ${code}: ${err.details || err.message}`, code));
           return;
         }
-        resolve(response ?? {});
+        if (response === undefined || response === null) {
+          reject(new ConfigurationException(`gRPC ${grpc.status.UNKNOWN}: status missing`, grpc.status.UNKNOWN));
+          return;
+        }
+        resolve(response);
       },
     );
   });

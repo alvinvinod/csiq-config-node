@@ -13,6 +13,7 @@
  * Optional: SMOKE_TENANT_ID (10001), SMOKE_FLAG (first toggle from getAll, else EnableFoo),
  * SMOKE_WRITE=true to flip and restore a feature toggle.
  * CONFIG_SERVICE_ROOT_CERT_PATH overrides the exported ASP.NET HTTPS cert.
+ * Non-loopback CONFIG_SERVICE_URI needs CONFIG_SERVICE_ALLOW_REMOTE=true.
  *
  * Uses compiled dist/ (npm run build). Not part of npm test.
  */
@@ -21,19 +22,20 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const {
+  createConfigurationClient,
+  ConfigurationException,
+  OverrideLevel,
+  assertRemoteAllowed,
+} = require('../dist');
 
 const casTenantId = intEnv('SMOKE_TENANT_ID', 10001);
 const write = truthy(process.env.SMOKE_WRITE);
 const host = process.env.CONFIG_SERVICE_URI || 'localhost:7154';
 const insecure = truthy(process.env.CONFIG_SERVICE_INSECURE);
+assertRemoteAllowed(host, insecure, truthy(process.env.CONFIG_SERVICE_ALLOW_REMOTE));
 
 const rootCertPath = process.env.CONFIG_SERVICE_ROOT_CERT_PATH || (!insecure ? writeServerCert(host) : undefined);
-
-const {
-  createConfigurationClient,
-  ConfigurationException,
-  OverrideLevel,
-} = require('../dist');
 
 function truthy(raw) {
   return ['1', 'true', 'yes', 'on'].includes(String(raw || '').trim().toLowerCase());
